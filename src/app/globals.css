@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+/* 入力欄 */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ステータス */
+.status-ok { @apply text-green-600 font-semibold; }
+.status-warning { @apply text-orange-500 font-semibold; }
+.status-unchecked { @apply text-gray-400; }
+
+/* 項目色 */
+.item-bogoufuku { @apply bg-amber-100; }
+.item-tebukuro { @apply bg-blue-100; }
+.item-kyuushukan { @apply bg-emerald-100; }

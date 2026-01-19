@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チェックシート オーバーレイツール</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      min-height: 100vh;
+      color: white;
+    }
+    .controls {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #16213e;
+      padding: 12px 20px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      z-index: 1000;
+      flex-wrap: wrap;
+      border-bottom: 2px solid #0f3460;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-group label {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .controls input[type="file"] {
+      display: none;
+    }
+    .controls button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .btn-upload {
+      background: #4CAF50;
+      color: white;
+    }
+    .btn-upload:hover {
+      background: #45a049;
+    }
+    .btn-nav {
+      background: #3b82f6;
+      color: white;
+    }
+    .btn-nav:hover {
+      background: #2563eb;
+    }
+    .btn-nav:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+    select, input[type="number"], input[type="text"] {
+      padding: 6px 10px;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      background: #1e293b;
+      color: white;
+      font-size: 14px;
+    }
+    input[type="number"] {
+      width: 70px;
+      text-align: center;
+    }
+    input[type="text"] {
+      width: 100px;
+    }
+    .arrow-btn {
+      padding: 6px 10px;
+      background: #475569;
+      color: white;
+      font-size: 12px;
+    }
+    .arrow-btn:hover {
+      background: #64748b;
+    }
+    .item-btn {
+      padding: 10px 20px;
+      font-weight: bold;
+      border: 2px solid transparent;
+    }
+    .item-btn.active {
+      border-color: white;
+    }
+    .item-btn.bogoufuku {
+      background: #FBBF24;
+      color: #78350F;
+    }
+    .item-btn.tebukuro {
+      background: #3B82F6;
+      color: white;
+    }
+    .item-btn.kyuushukan {
+      background: #10B981;
+      color: white;
+    }
+    
+    /* 会社タブ */
+    .company-tabs {
+      position: fixed;
+      top: 70px;
+      left: 0;
+      right: 0;
+      background: #0f3460;
+      padding: 8px 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      z-index: 999;
+      border-bottom: 2px solid #1a1a2e;
+    }
+    .company-tab {
+      padding: 8px 16px;
+      background: #1e293b;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .company-tab.active {
+      background: #3b82f6;
+      color: white;
+      border-color: white;
+    }
+    .company-tab.has-file {
+      color: white;
+    }
+    .company-tab .status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #475569;
+    }
+    .company-tab.has-file .status {
+      background: #4CAF50;
+    }
+    .add-company-btn {
+      padding: 8px 12px;
+      background: #475569;
+      color: white;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .add-company-btn:hover {
+      background: #64748b;
+    }
+    .remove-company-btn {
+      padding: 2px 6px;
+      background: #ef4444;
+      color: white;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 4px;
+    }
+    .remove-company-btn:hover {
+      background: #dc2626;
+    }
+    
+    .container {
+      margin-top: 130px;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      padding-bottom: 80px;
+    }
+    .image-wrapper {
+      position: relative;
+      display: inline-block;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      background: white;
+    }
+    .image-wrapper img,
+    .image-wrapper canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    .lines-container {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      pointer-events: none;
+    }
+    .overlay-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      opacity: 0.5;
+    }
+    .overlay-line.bogoufuku {
+      background: #FBBF24;
+    }
+    .overlay-line.tebukuro {
+      background: #3B82F6;
+    }
+    .overlay-line.kyuushukan {
+      background: #10B981;
+    }
+    .drop-zone {
+      border: 3px dashed #475569;
+      border-radius: 10px;
+      padding: 80px 60px;
+      text-align: center;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.3s;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .drop-zone:hover {
+      border-color: #4CAF50;
+      background: rgba(76, 175, 80, 0.1);
+    }
+    .drop-zone h2 {
+      margin-bottom: 10px;
+      color: white;
+    }
+    .instructions {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #16213e;
+      color: #94a3b8;
+      padding: 12px 20px;
+      font-size: 13px;
+      border-top: 2px solid #0f3460;
+    }
+    .page-info {
+      background: #0f3460;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .hint {
+      font-size: 11px;
+      color: #64748b;
+    }
+    
+    /* 会社名編集モーダル */
+    .edit-name-input {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 4px;
+      padding: 6px 10px;
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 4px;
+      color: white;
+      font-size: 14px;
+      z-index: 1001;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label>
+      <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+        📄 PDF / 画像
+      </button>
+      <input type="file" id="fileInput" accept=".pdf,image/*">
+    </label>
+    
+    <div class="control-group">
+      <label>人数:</label>
+      <select id="personCount" onchange="updateLines()">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6" selected>6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>位置:</label>
+      <button class="arrow-btn" onclick="adjustPosition(-1)">▲</button>
+      <input type="number" id="linePosition" value="207" onchange="updatePosition()">
+      <button class="arrow-btn" onclick="adjustPosition(1)">▼</button>
+    </div>
+    
+    <div class="control-group">
+      <button class="item-btn bogoufuku active" onclick="selectItem('bogoufuku')">防護服</button>
+      <button class="item-btn tebukuro" onclick="selectItem('tebukuro')">手袋</button>
+      <button class="item-btn kyuushukan" onclick="selectItem('kyuushukan')">吸収缶</button>
+    </div>
+
+    <div class="control-group" id="pageControls" style="display:none;">
+      <button class="btn-nav" id="prevBtn" onclick="changePage(-1)">←</button>
+      <span class="page-info"><span id="currentPage">1</span>/<span id="totalPages">1</span></span>
+      <button class="btn-nav" id="nextBtn" onclick="changePage(1)">→</button>
+    </div>
+  </div>
+
+  <!-- 会社タブ -->
+  <div class="company-tabs" id="companyTabs">
+    <div class="company-tab active has-file" data-index="0" onclick="selectCompany(0)">
+      <span class="status"></span>
+      <span class="name">さくら塗装</span>
+    </div>
+    <div class="company-tab" data-index="1" onclick="selectCompany(1)">
+      <span class="status"></span>
+      <span class="name">竹内塗装</span>
+    </div>
+    <div class="company-tab" data-index="2" onclick="selectCompany(2)">
+      <span class="status"></span>
+      <span class="name">リバーランズ</span>
+    </div>
+    <button class="add-company-btn" onclick="addCompany()">+ 追加</button>
+  </div>
+
+  <div class="container" id="container">
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <h2>📄 PDFまたは画像をドロップ</h2>
+      <p>選択中の会社: <strong id="currentCompanyName">さくら塗装</strong></p>
+      <p style="margin-top: 10px;">ファイルをここにドラッグ&ドロップ、またはクリックして選択</p>
+      <p class="hint" style="margin-top:15px;">💡 Ctrl+V でクリップボードから貼り付けも可能</p>
+      <p class="hint">💡 会社タブをダブルクリックで名前変更</p>
+    </div>
+  </div>
+
+  <div class="instructions">
+    💡 項目ボタンで切り替え | ▲▼で微調整 | ←→キーでページ切替 | 1,2,3キーで会社切替
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // 設定
+    const CONFIG = {
+      ROW_SPACING: 48,          // 間隔
+      LINE_HEIGHT: 14,          // 線形
+      BOGOUFUKU_START: 207,     // 防護服の初期位置
+      BOGOUFUKU_TO_TEBUKURO: 14,   // 防護服→手袋 (221-207)
+      TEBUKURO_TO_KYUUSHUKAN: 15,  // 手袋→吸収缶 (236-221)
+    };
+
+    // 会社データ
+    let companies = [
+      { name: 'さくら塗装', pdfDoc: null, currentPage: 1, totalPages: 0, imageData: null },
+      { name: '竹内塗装', pdfDoc: null, currentPage: 1, totalPages: 0, imageData: null },
+      { name: 'リバーランズ', pdfDoc: null, currentPage: 1, totalPages: 0, imageData: null },
+    ];
+    let currentCompanyIndex = 0;
+    let currentItem = 'bogoufuku';
+    let basePosition = CONFIG.BOGOUFUKU_START; // 207
+
+    // 初期化
+    function init() {
+      renderCompanyTabs();
+      updateCurrentCompanyDisplay();
+    }
+
+    // 会社タブを描画
+    function renderCompanyTabs() {
+      const tabsContainer = document.getElementById('companyTabs');
+      tabsContainer.innerHTML = '';
+      
+      companies.forEach((company, index) => {
+        const tab = document.createElement('div');
+        tab.className = `company-tab ${index === currentCompanyIndex ? 'active' : ''} ${company.pdfDoc || company.imageData ? 'has-file' : ''}`;
+        tab.dataset.index = index;
+        tab.onclick = () => selectCompany(index);
+        tab.ondblclick = (e) => startEditName(index, e);
+        
+        tab.innerHTML = `
+          <span class="status"></span>
+          <span class="name">${company.name}</span>
+          ${companies.length > 1 ? `<button class="remove-company-btn" onclick="event.stopPropagation(); removeCompany(${index})">✕</button>` : ''}
+        `;
+        
+        tabsContainer.appendChild(tab);
+      });
+      
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-company-btn';
+      addBtn.onclick = addCompany;
+      addBtn.textContent = '+ 追加';
+      tabsContainer.appendChild(addBtn);
+    }
+
+    // 会社選択
+    function selectCompany(index) {
+      currentCompanyIndex = index;
+      renderCompanyTabs();
+      updateCurrentCompanyDisplay();
+      
+      const company = companies[index];
+      if (company.pdfDoc) {
+        document.getElementById('pageControls').style.display = 'flex';
+        document.getElementById('totalPages').textContent = company.totalPages;
+        document.getElementById('currentPage').textContent = company.currentPage;
+        renderPage(company.currentPage);
+      } else if (company.imageData) {
+        document.getElementById('pageControls').style.display = 'none';
+        showImageFromData(company.imageData);
+      } else {
+        showDropZone();
+      }
+    }
+
+    // 現在の会社名表示を更新
+    function updateCurrentCompanyDisplay() {
+      const nameEl = document.getElementById('currentCompanyName');
+      if (nameEl) {
+        nameEl.textContent = companies[currentCompanyIndex].name;
+      }
+    }
+
+    // 会社追加
+    function addCompany() {
+      const newIndex = companies.length + 1;
+      companies.push({
+        name: `会社${newIndex}`,
+        pdfDoc: null,
+        currentPage: 1,
+        totalPages: 0,
+        imageData: null,
+      });
+      renderCompanyTabs();
+    }
+
+    // 会社削除
+    function removeCompany(index) {
+      if (companies.length <= 1) return;
+      companies.splice(index, 1);
+      if (currentCompanyIndex >= companies.length) {
+        currentCompanyIndex = companies.length - 1;
+      }
+      renderCompanyTabs();
+      selectCompany(currentCompanyIndex);
+    }
+
+    // 会社名編集開始
+    function startEditName(index, event) {
+      const tab = event.currentTarget;
+      const nameSpan = tab.querySelector('.name');
+      const currentName = companies[index].name;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'edit-name-input';
+      input.value = currentName;
+      input.style.position = 'fixed';
+      input.style.left = tab.getBoundingClientRect().left + 'px';
+      input.style.top = (tab.getBoundingClientRect().bottom + 4) + 'px';
+      
+      input.onblur = () => finishEditName(index, input);
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          finishEditName(index, input);
+        } else if (e.key === 'Escape') {
+          input.remove();
+        }
+      };
+      
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+    }
+
+    // 会社名編集完了
+    function finishEditName(index, input) {
+      const newName = input.value.trim();
+      if (newName) {
+        companies[index].name = newName;
+        renderCompanyTabs();
+        updateCurrentCompanyDisplay();
+      }
+      input.remove();
+    }
+
+    // ドロップゾーン表示
+    function showDropZone() {
+      const container = document.getElementById('container');
+      container.innerHTML = `
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <h2>📄 PDFまたは画像をドロップ</h2>
+          <p>選択中の会社: <strong id="currentCompanyName">${companies[currentCompanyIndex].name}</strong></p>
+          <p style="margin-top: 10px;">ファイルをここにドラッグ&ドロップ、またはクリックして選択</p>
+          <p class="hint" style="margin-top:15px;">💡 Ctrl+V でクリップボードから貼り付けも可能</p>
+        </div>
+      `;
+      document.getElementById('pageControls').style.display = 'none';
+    }
+
+    // ファイル選択
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        handleFile(e.target.files[0]);
+        e.target.value = ''; // リセット
+      }
+    });
+
+    // ドラッグ&ドロップ
+    document.addEventListener('dragover', function(e) {
+      e.preventDefault();
+    });
+    
+    document.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // クリップボードから貼り付け
+    document.addEventListener('paste', function(e) {
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          handleFile(file);
+          break;
+        }
+      }
+    });
+
+    // ファイル処理
+    function handleFile(file) {
+      if (file.type === 'application/pdf') {
+        loadPdf(file);
+      } else if (file.type.startsWith('image/')) {
+        loadImage(file);
+      }
+    }
+
+    // PDF読み込み
+    async function loadPdf(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      const company = companies[currentCompanyIndex];
+      company.pdfDoc = pdfDoc;
+      company.totalPages = pdfDoc.numPages;
+      company.currentPage = 1;
+      company.imageData = null;
+      
+      document.getElementById('totalPages').textContent = company.totalPages;
+      document.getElementById('pageControls').style.display = 'flex';
+      
+      renderCompanyTabs();
+      renderPage(1);
+    }
+
+    // PDFページ描画
+    async function renderPage(pageNum) {
+      const company = companies[currentCompanyIndex];
+      if (!company.pdfDoc) return;
+      
+      const page = await company.pdfDoc.getPage(pageNum);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      showContent(canvas);
+      company.currentPage = pageNum;
+      document.getElementById('currentPage').textContent = pageNum;
+      updateNavButtons();
+    }
+
+    // 画像読み込み
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const company = companies[currentCompanyIndex];
+        company.imageData = e.target.result;
+        company.pdfDoc = null;
+        company.totalPages = 0;
+        company.currentPage = 1;
+        
+        showImageFromData(e.target.result);
+        renderCompanyTabs();
+      };
+      reader.readAsDataURL(file);
+      
+      document.getElementById('pageControls').style.display = 'none';
+    }
+
+    // 画像データから表示
+    function showImageFromData(dataUrl) {
+      const img = new Image();
+      img.onload = function() {
+        showContent(img);
+      };
+      img.src = dataUrl;
+    }
+
+    // コンテンツ表示
+    function showContent(element) {
+      const container = document.getElementById('container');
+      container.innerHTML = `
+        <div class="image-wrapper" id="imageWrapper">
+          <div class="lines-container" id="linesContainer"></div>
+        </div>
+      `;
+      
+      const wrapper = document.getElementById('imageWrapper');
+      if (element instanceof HTMLCanvasElement) {
+        wrapper.insertBefore(element, wrapper.firstChild);
+      } else {
+        const clone = element.cloneNode();
+        wrapper.insertBefore(clone, wrapper.firstChild);
+      }
+      
+      updateLines();
+    }
+
+    // 項目選択
+    function selectItem(item) {
+      currentItem = item;
+      
+      document.querySelectorAll('.item-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`.item-btn.${item}`).classList.add('active');
+      
+      updateLines();
+    }
+
+    // 現在の項目に応じた位置を計算
+    function getCurrentPosition() {
+      let pos = basePosition;
+      if (currentItem === 'tebukuro') {
+        pos += CONFIG.BOGOUFUKU_TO_TEBUKURO;
+      } else if (currentItem === 'kyuushukan') {
+        pos += CONFIG.BOGOUFUKU_TO_TEBUKURO + CONFIG.TEBUKURO_TO_KYUUSHUKAN;
+      }
+      return pos;
+    }
+
+    // 位置調整
+    function adjustPosition(delta) {
+      basePosition += delta;
+      document.getElementById('linePosition').value = basePosition;
+      updateLines();
+    }
+
+    // 位置更新（入力欄から）
+    function updatePosition() {
+      basePosition = parseInt(document.getElementById('linePosition').value) || 0;
+      updateLines();
+    }
+
+    // 線を更新
+    function updateLines() {
+      const linesContainer = document.getElementById('linesContainer');
+      if (!linesContainer) return;
+      
+      const count = parseInt(document.getElementById('personCount').value);
+      const position = getCurrentPosition();
+      
+      document.getElementById('linePosition').value = basePosition;
+      
+      linesContainer.innerHTML = '';
+      
+      for (let i = 0; i < count; i++) {
+        const line = document.createElement('div');
+        line.className = `overlay-line ${currentItem}`;
+        line.style.height = CONFIG.LINE_HEIGHT + 'px';
+        line.style.top = (position + i * CONFIG.ROW_SPACING) + 'px';
+        linesContainer.appendChild(line);
+      }
+    }
+
+    // ページ切り替え
+    function changePage(delta) {
+      const company = companies[currentCompanyIndex];
+      if (!company.pdfDoc) return;
+      
+      const newPage = company.currentPage + delta;
+      if (newPage >= 1 && newPage <= company.totalPages) {
+        renderPage(newPage);
+      }
+    }
+
+    // ナビボタン更新
+    function updateNavButtons() {
+      const company = companies[currentCompanyIndex];
+      document.getElementById('prevBtn').disabled = company.currentPage <= 1;
+      document.getElementById('nextBtn').disabled = company.currentPage >= company.totalPages;
+    }
+
+    // キーボードショートカット
+    document.addEventListener('keydown', function(e) {
+      // 入力欄にフォーカスがある場合はスキップ
+      if (e.target.tagName === 'INPUT') return;
+      
+      if (e.key === 'ArrowLeft') {
+        const company = companies[currentCompanyIndex];
+        if (company.pdfDoc) changePage(-1);
+      } else if (e.key === 'ArrowRight') {
+        const company = companies[currentCompanyIndex];
+        if (company.pdfDoc) changePage(1);
+      } else if (e.key === 'ArrowUp') {
+        adjustPosition(-1);
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        adjustPosition(1);
+        e.preventDefault();
+      } else if (e.key === '1') {
+        selectCompany(0);
+      } else if (e.key === '2' && companies.length >= 2) {
+        selectCompany(1);
+      } else if (e.key === '3' && companies.length >= 3) {
+        selectCompany(2);
+      } else if (e.key === '4' && companies.length >= 4) {
+        selectCompany(3);
+      } else if (e.key === 'q') {
+        selectItem('bogoufuku');
+      } else if (e.key === 'w') {
+        selectItem('tebukuro');
+      } else if (e.key === 'e') {
+        selectItem('kyuushukan');
+      }
+    });
+
+    // 初期化実行
+    init();
+  </script>
+</body>
+</html>
