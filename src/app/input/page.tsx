@@ -186,7 +186,6 @@ export default function InputPage() {
               key={vendor.id}
               onClick={() => {
                 setSelectedVendorId(vendor.id);
-                setSelectedWeekIndex(0);
               }}
               className={`px-4 py-2 rounded whitespace-nowrap ${
                 vendor.id === selectedVendorId
